@@ -1,6 +1,5 @@
 import streamlit as st
 import os
-import sys
 import hashlib
 import json
 from datetime import datetime
@@ -16,13 +15,9 @@ st.set_page_config(
 )
 
 # =====================================================================
-# AMBIL SECRET
+# KONFIGURASI
 # =====================================================================
-try:
-    SECRET_KEY = st.secrets["SECRET_KEY"]
-except:
-    SECRET_KEY = os.environ.get("SECRET_KEY", "sugianti123@")
-
+SECRET_KEY = "sugianti123@"
 DB_FILE = "licenses.json"
 
 WA_NUMBER = "62881022005320"
@@ -138,7 +133,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # =====================================================================
-# HALAMAN UTAMA - VERSI SEDERHANA
+# HALAMAN UTAMA
 # =====================================================================
 st.markdown("# 🎵 Audio Fingerprint Remover")
 st.divider()
@@ -183,9 +178,6 @@ if uploaded_file is not None:
     
     st.success(f"✅ {uploaded_file.name} ({file_size_mb:.1f} MB)")
     
-    # Simpan file
-    file_data = uploaded_file.read()
-    
     st.markdown("---")
     st.markdown("### 🚀 Proses Audio")
     
@@ -195,17 +187,13 @@ if uploaded_file is not None:
     with col2:
         st.metric("📦 Ukuran", f"{file_size_mb:.1f} MB")
     
-    # Informasi: Proses sedang dalam pengembangan
+    # INFO: Proses audio coming soon
     st.info("""
     ⚠️ **Mode Demo**
     
-    Fitur proses audio sedang dalam pengembangan untuk kompatibilitas HP.
-    Saat ini Anda bisa:
-    1. Upload file audio
-    2. Atur efek (Tempo, Nada, Level)
-    3. Proses akan tersedia segera
-    
-    Untuk bantuan, hubungi WhatsApp atau Telegram.
+    Fitur proses audio sedang dalam pengembangan.
+    Saat ini Anda bisa upload file dan atur efek.
+    Proses audio akan segera tersedia!
     """)
     
     if st.button("🎵 Proses Sekarang (Coming Soon)", type="primary", use_container_width=True, disabled=True):
