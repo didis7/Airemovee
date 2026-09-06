@@ -116,6 +116,7 @@ def setup_logging(verbose: bool = False):
     logging.getLogger('numba').setLevel(logging.ERROR)
     return logging.getLogger(__name__)
 
+# Global logger - akan diinisialisasi ulang di main
 logger = setup_logging()
 
 # ============================================================================
