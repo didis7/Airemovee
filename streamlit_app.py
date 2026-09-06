@@ -8,6 +8,7 @@ import librosa
 import soundfile as sf
 import requests
 from scipy.signal import butter, filtfilt, welch
+from scipy.stats import kurtosis
 
 # ============================================================================
 # PAGE CONFIG
@@ -491,6 +492,10 @@ def detect_ai_local(audio: np.ndarray, sr: int) -> dict:
     Deteksi AI sederhana menggunakan analisis spektral lokal (fallback).
     """
     try:
+        # Pastikan audio mono
+        if len(audio.shape) > 1:
+            audio = np.mean(audio, axis=0)
+        
         freqs, psd = welch(audio, sr, nperseg=2048)
         
         high_freq_mask = freqs > 15000
@@ -501,7 +506,6 @@ def detect_ai_local(audio: np.ndarray, sr: int) -> dict:
         else:
             high_freq_ratio = 0
         
-        from scipy.stats import kurtosis
         spectral_kurtosis = kurtosis(psd)
         
         ai_score = 0
@@ -544,30 +548,45 @@ def remove_fingerprints(audio: np.ndarray, sr: int, level: str, aggressive: bool
     audio = audio.copy()
     is_stereo = len(audio.shape) > 1
     
-    filter_params = {
-        'gentle': {'order': 1, 'cutoff': 0.95},
-        'moderate': {'order': 2, 'cutoff': 0.9},
-        'aggressive': {'order': 3, 'cutoff': 0.85}
-    }
-    params = filter_params.get(level, filter_params['moderate'])
-    
-    if aggressive:
-        params['order'] = min(params['order'] + 1, 4)
-        params['cutoff'] = max(params['cutoff'] - 0.05, 0.7)
-    
-    try:
-        if is_stereo:
-            processed = audio.copy()
-            for i in range(audio.shape[0]):
+    # Jika stereo, proses per channel
+    if is_stereo:
+        filter_params = {
+            'gentle': {'order': 1, 'cutoff': 0.95},
+            'moderate': {'order': 2, 'cutoff': 0.9},
+            'aggressive': {'order': 3, 'cutoff': 0.85}
+        }
+        params = filter_params.get(level, filter_params['moderate'])
+        
+        if aggressive:
+            params['order'] = min(params['order'] + 1, 4)
+            params['cutoff'] = max(params['cutoff'] - 0.05, 0.7)
+        
+        processed = np.zeros_like(audio)
+        for i in range(audio.shape[0]):
+            try:
                 b, a = butter(params['order'], params['cutoff'], btype='low')
-                processed[i] = filtfilt(b, a, processed[i])
-            return processed
-        else:
+                processed[i] = filtfilt(b, a, audio[i])
+            except Exception:
+                processed[i] = audio[i]
+        return processed
+    else:
+        # Mono
+        filter_params = {
+            'gentle': {'order': 1, 'cutoff': 0.95},
+            'moderate': {'order': 2, 'cutoff': 0.9},
+            'aggressive': {'order': 3, 'cutoff': 0.85}
+        }
+        params = filter_params.get(level, filter_params['moderate'])
+        
+        if aggressive:
+            params['order'] = min(params['order'] + 1, 4)
+            params['cutoff'] = max(params['cutoff'] - 0.05, 0.7)
+        
+        try:
             b, a = butter(params['order'], params['cutoff'], btype='low')
             return filtfilt(b, a, audio)
-    except Exception as e:
-        st.warning(f"Filter error: {e}")
-        return audio
+        except Exception:
+            return audio
 
 def apply_tempo_pitch(audio: np.ndarray, sr: int, tempo: float, pitch_semitones: float, pitch_percent: float) -> np.ndarray:
     """
@@ -640,10 +659,7 @@ with col2:
     
     st.markdown("---")
     
-    # ============================================================
-    # MENGGUNAKAN SLIDER - LEBIH AMAN (TIDAK ERROR)
-    # ============================================================
-    
+    # SLIDER
     col_tempo, col_pitch = st.columns(2)
     
     with col_tempo:
@@ -761,7 +777,12 @@ if process_btn:
             progress_bar.progress(25)
             
             with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_detect:
-                sf.write(tmp_detect.name, y.T if is_stereo else y, sr)
+                # Tulis audio dalam format yang benar
+                if is_stereo:
+                    sf.write(tmp_detect.name, y.T, sr)
+                else:
+                    sf.write(tmp_detect.name, y, sr)
+                
                 if use_api_detection:
                     detection_before = check_ai_with_api(tmp_detect.name)
                 else:
@@ -769,10 +790,9 @@ if process_btn:
                 os.unlink(tmp_detect.name)
             
             # ============================================================
-            # STEP 4: APLIKASI TEMPO & PITCH (JIKA ADA PERUBAHAN)
+            # STEP 4: APLIKASI TEMPO & PITCH
             # ============================================================
             
-            # Ambil nilai dengan aman (sudah pasti float dari slider)
             tempo_val = float(tempo)
             pitch_semitones_val = float(pitch_semitones)
             pitch_percent_val = float(pitch_percent)
@@ -843,7 +863,11 @@ if process_btn:
             progress_bar.progress(80)
             
             with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_result:
-                sf.write(tmp_result.name, processed.T if is_stereo else processed, sr)
+                if is_stereo:
+                    sf.write(tmp_result.name, processed.T, sr)
+                else:
+                    sf.write(tmp_result.name, processed, sr)
+                
                 if use_api_detection:
                     detection_after = check_ai_with_api(tmp_result.name)
                 else:
@@ -875,9 +899,7 @@ if process_btn:
             status_text.success("✅ Proses selesai!")
             
             # ============================================================
-            # ============================================================
-            # TAMPILKAN HASIL - BESAR DAN JELAS
-            # ============================================================
+            # TAMPILKAN HASIL
             # ============================================================
             
             st.markdown("---")
