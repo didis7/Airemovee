@@ -1,2 +1,7 @@
 streamlit
+numpy
+scipy
+librosa
+soundfile
+mutagen
 requests
